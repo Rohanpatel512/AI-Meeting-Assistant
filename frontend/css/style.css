@@ -1,0 +1,285 @@
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+.meeting-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+
+    width: 100%;
+    max-width: 1250px;
+    margin: 0 auto;
+
+    padding: 20px 28px 40px;
+    box-sizing: border-box;
+}
+
+.meeting-input {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.upload-section {
+    width: 100%;
+}
+
+.upload-box {
+    min-height: 255px;
+
+    border: 2px dashed #cfd4e3;
+    border-radius: 10px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    background: #fcfcff;
+
+    box-sizing: border-box;
+    padding: 30px;
+}
+
+.upload-icon {
+    width: 58px;
+    height: 58px;
+
+    border-radius: 50%;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 38px;
+    font-weight: 300;
+
+    color: #5b5cf0;
+
+    margin-bottom: 12px;
+}
+
+.upload-box h2 {
+    margin: 0 0 8px;
+
+    font-size: 20px;
+    font-weight: 650;
+
+    color: #161a2b;
+}
+
+.upload-box p {
+    margin: 0 0 20px;
+
+    font-size: 14px;
+    color: #70758a;
+}
+
+.choose-file-btn {
+    border: none;
+    border-radius: 7px;
+
+    background: #5b5cf0;
+    color: white;
+
+    padding: 11px 30px;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition: background 0.2s ease;
+}
+
+.choose-file-btn:hover {
+    background: #4c4ddf;
+}
+
+.upload-info {
+    display: flex;
+    justify-content: space-between;
+
+    padding: 12px 6px 0;
+
+    font-size: 12px;
+    color: #62687d;
+}
+
+.uploaded-file-card {
+    border: 1px solid #e1e3eb;
+    border-radius: 10px;
+
+    background: white;
+
+    padding: 16px;
+}
+
+.file-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: 12px;
+}
+
+.file-header h3 {
+    margin: 0;
+
+    font-size: 14px;
+    font-weight: 650;
+
+    color: #25293a;
+}
+
+.remove-btn {
+    border: 1px solid #f0d5d5;
+    background: white;
+
+    color: #e05252;
+
+    border-radius: 6px;
+
+    padding: 7px 12px;
+
+    font-size: 12px;
+
+    cursor: pointer;
+}
+
+.remove-btn:hover {
+    background: #fff7f7;
+}
+
+.file-content {
+    border: 1px solid #e6e8ef;
+    border-radius: 8px;
+
+    padding: 14px;
+
+    display: flex;
+    align-items: center;
+
+    gap: 14px;
+}
+
+.summary-panel {
+    border: 1px solid #e1e3eb;
+    border-radius: 10px;
+
+    background: white;
+
+    padding: 22px;
+
+    box-sizing: border-box;
+}
+
+.summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    padding-bottom: 20px;
+
+    border-bottom: 1px solid #eceef3;
+}
+
+.summary-title {
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+}
+
+.summary-title h2 {
+    margin: 0;
+
+    font-size: 19px;
+    font-weight: 650;
+
+    color: #171b2d;
+}
+
+.sparkle {
+    color: #5b5cf0;
+    font-size: 22px;
+}
+
+.summary-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.summary-actions button {
+    background: white;
+
+    border: 1px solid #dfe2eb;
+
+    border-radius: 6px;
+
+    padding: 8px 13px;
+
+    font-size: 11px;
+
+    color: #454a5b;
+
+    cursor: pointer;
+}
+
+.summary-actions button:hover {
+    background: #f8f8fc;
+}
+
+
+@media (max-width: 1000px) {
+
+    .meeting-container {
+        grid-template-columns: 1fr;
+    }
+
+    .summary-panel {
+        margin-top: 10px;
+    }
+}
+
+
+@media (max-width: 650px) {
+
+    .meeting-container {
+        padding: 15px;
+    }
+
+    .options-content {
+        grid-template-columns: 1fr;
+    }
+
+    .file-content {
+        flex-wrap: wrap;
+    }
+
+    .file-ready {
+        width: 100%;
+        margin-left: 59px;
+    }
+
+    .upload-info {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .summary-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .action-item {
+        grid-template-columns: 18px 1fr;
+    }
+
+    .action-item .date {
+        grid-column: 2;
+        width: fit-content;
+    }
+}
