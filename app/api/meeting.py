@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+from services.meeting_service import summarize
 
 meeting_router = APIRouter(prefix="/meeting", tags=["Meeting"])
 
@@ -20,6 +21,7 @@ async def summarize_meeting(file: UploadFile):
         raise HTTPException(status_code=401, detail="File contents empty")
 
     # TODO: Set up call to summarize meeting text
+    summarize(meeting_text)
 
 
 @meeting_router.post("/analyze")

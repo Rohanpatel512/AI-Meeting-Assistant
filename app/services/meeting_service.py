@@ -1,5 +1,8 @@
 # Imports
+import google as genai
+from core.schemas import MeetingNotes
 
+client = genai.Client()
 
 def summarize(meeting_contents):
     """
@@ -8,4 +11,39 @@ def summarize(meeting_contents):
     Args:
         meeting_contents - All meeting contents extracted from transcript (str)
     
+    Returns:
+        summary - Important details from meeting in JSON format (JSON)
     """
+
+    interaction = client.interactions.create(
+        model="gemini-2.5-flash",
+        input=f"""
+        Summarize the following meeting transcript.
+
+        Focus on:
+            - The main topics discussed.
+            - Identifying tasks that need to be completed and their deadlines.
+            - Key decisions that were made.
+     
+        Only include tasks, deadlines, and decisions that are explicitly stated or clearly supported by the transcript. Do not invent or assume information.
+    
+        Organize the summary into these points:
+            1. Overview
+            2. Key Discussion Points
+            3. Tasks and Deadlines
+            4. Decisions
+
+        Keep the summary concise and easy to read
+
+        Meeting Transcript:
+        {meeting_contents}
+        """,
+
+        response_format={
+            'type': "text",
+            "mime_type": "application/json"
+        }
+    )
+
+
+
