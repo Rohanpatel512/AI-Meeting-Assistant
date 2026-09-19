@@ -1,23 +1,25 @@
 # Imports
-import google as genai
-from core.schemas import MeetingNotes
+from google import genai
+from app.core.schemas import MeetingNotes
 
-client = genai.Client()
-
+#client = genai.Client()
 def summarize(meeting_contents):
-    """
+    pass 
+"""
+def summarize(meeting_contents):
+    
     Utilizes an open-source LLM to generate meaningful meeting notes for user.
 
     Args:
         meeting_contents - All meeting contents extracted from transcript (str)
     
     Returns:
-        summary - Important details from meeting in JSON format (JSON)
-    """
+        meeting_summary - Important details from meeting in JSON format (MeetingNotes)
+    
 
     interaction = client.interactions.create(
         model="gemini-2.5-flash",
-        input=f"""
+        input=f
         Summarize the following meeting transcript.
 
         Focus on:
@@ -37,13 +39,18 @@ def summarize(meeting_contents):
 
         Meeting Transcript:
         {meeting_contents}
-        """,
+        ,
 
         response_format={
             'type': "text",
-            "mime_type": "application/json"
+            "mime_type": "application/json",
+            "schema": MeetingNotes.model_json_schema()
         }
     )
 
+    meeting_summary = MeetingNotes.model_validate_json(interaction.output_text)
+
+    return meeting_summary
 
 
+"""
