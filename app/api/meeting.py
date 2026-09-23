@@ -43,10 +43,9 @@ async def summarize_meeting(file: UploadFile):
         )
     
     # Set up call to summarize meeting text
-    #summarized_meeting = summarize(meeting_text)
-
-    #return summarized_meeting
-    return "Meeting summarized!"
+    summarized_meeting = summarize(meeting_text)
+    
+    return summarized_meeting
 
 
 @meeting_router.post("/analyze")
