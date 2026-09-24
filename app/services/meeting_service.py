@@ -38,7 +38,8 @@ def summarize(meeting_contents):
             {"role": "system", "content": prompt},
             {"role": "user", "content": f"Extract:\n{meeting_contents}"}
         ],
-        response_model=MeetingNotes
+        response_model=MeetingNotes,
+        max_tokens=3000
     )
 
     return response

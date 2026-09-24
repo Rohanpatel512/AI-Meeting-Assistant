@@ -295,6 +295,15 @@ body {
     background: #f8f8fc;
 }
 
+.content-boxes {
+    display: flex;
+    flex-direction: column;
+}
+
+.summary-container {
+    height: 400px;
+    overflow-y: auto;
+}
 
 @media (max-width: 1000px) {
 
