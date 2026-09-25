@@ -6,6 +6,93 @@ const removeBtn = document.querySelector(".remove-btn");
 const summaryOutput = document.querySelector(".summary-container");
 const API_BASED_URL = window.APP_CONFIG?.API_BASE_URL ?? "";
 
+/*
+const testResponse = {
+    decisions: [
+        {
+            text: "Marketing team will avoid using the analytics tab until backend fix.",
+            rationale: "Analytics tab likely to cause timeout due to ongoing database refactor."
+        },
+        {
+            text: "Code freeze is set for September 25th.",
+            rationale: "To allow full week of QA before release."
+        },
+        {
+            text: "Ad sets launch on October 1st if budget approved.",
+            rationale: "Maintaining launch schedule."
+        },
+        {
+            text: "Status check meeting on Friday.",
+            rationale: "To review progress."
+        },
+        {
+            text: "Critical bugs will be logged in Jira with the Launch-Blocker tag.",
+            rationale: "Ensure visibility to backend team."
+        }
+    ],
+
+    discussion_points: [
+        {
+            text: "Beta build status: stable core workflow, new dashboard, analytics tab problematic; fix expected by Friday."
+        },
+        {
+            text: "Marketing campaign readiness: ad copy, landing page, need sign-off by Thursday; ad launch on October 1st."
+        },
+        {
+            text: "Finance approval status: request submitted Monday, finance out until Wednesday, follow up Thursday."
+        },
+        {
+            text: "Code freeze target: September 25th; QA testing week; public release October 1st."
+        },
+        {
+            text: "Bug logging protocol: use Jira Launch-Blocker tag for critical issues found during demo recording."
+        },
+        {
+            text: "Next status check meeting scheduled for Friday."
+        }
+    ],
+
+    overview: "Team aligned on Q4 product launch, addressing beta build readiness, marketing campaign schedule, finance approval timeline, code freeze, bug logging protocol, and next status check.",
+
+    tasks_and_deadlines: [
+        {
+            task: "Fix analytics tab bug",
+            assignee: "Elena",
+            deadline: "Friday"
+        },
+        {
+            task: "Follow up with finance for budget approval",
+            assignee: "James",
+            deadline: "Thursday"
+        },
+        {
+            task: "Implement code freeze",
+            assignee: null,
+            deadline: "2026-09-25"
+        },
+        {
+            task: "Record onboarding flow and main dashboard demos, avoid analytics tab",
+            assignee: "Marketing team",
+            deadline: "End of week"
+        },
+        {
+            task: "Log critical bugs in Jira with Launch-Blocker tag",
+            assignee: null,
+            deadline: "Immediate"
+        },
+        {
+            task: "Schedule status check meeting on Friday",
+            assignee: "Sarah",
+            deadline: "Friday"
+        }
+    ]
+};
+
+window.addEventListener('load', () => {
+    displayResponse(testResponse);
+});
+*/
+
 
 uploadBtn.addEventListener("click", () => {
     fileInput.click();
@@ -135,50 +222,62 @@ function displayUploadedFile(size, type, name, time) {
 }
 
 async function displayResponse(response) {
-
     summaryOutput.innerHTML = "";
 
-    for(const [key, value] of Object.entries(response)) {
-
+    for (const [key, value] of Object.entries(response)) {
         const box = document.createElement("div");
         box.className = "content-boxes";
-
-        const subtitle = document.createElement("h2");
-        box.appendChild(subtitle);
-
         summaryOutput.appendChild(box);
 
-        // converts JSON key to title 
-        const title = toTitle(key);
+        const subtitle = document.createElement("h2");
+        subtitle.textContent = "";
+        box.appendChild(subtitle);
 
+        const title = toTitle(key);
         await type(title, subtitle);
 
-        if(typeof value === "string") {
+        if (typeof value === "string") {
             const content = document.createElement("p");
+            content.textContent = "";
             box.appendChild(content);
             await type(value, content);
 
-        } else if(Array.isArray(value)) {
+        } else if (Array.isArray(value)) {
+            const list = document.createElement("ul");
+            list.className = "summary-list";
+            box.appendChild(list);
 
-            for(const item of value) {
-                const content = document.createElement("p");
-                box.appendChild(content);
+            for (const item of value) {
+                const listItem = document.createElement("li");
+                listItem.className = "summary-item";
+                listItem.textContent = "";
+                list.appendChild(listItem);
 
-                if(typeof item === "object" && item != "null") {
-                    const text = Object.values(item).filter(value => value != null).join(" - ");
+                if (item !== null && typeof item === "object") {
+                    const entries = Object.entries(item).filter(([_, itemValue]) => itemValue !== null);
 
-                    await type(text, content);
+                    for (const [entryKey, entryValue] of entries) {
+                        const field = document.createElement("div");
+                        field.className = `summary-${entryKey}`;
+                        field.textContent = "";
+                        listItem.appendChild(field);
+
+                        if (entryKey === "text" || entryKey === "task" || entryKey === "rationale") {
+                            await type(String(entryValue), field);
+                        } else {
+                            const label = entryKey
+                                .replaceAll("_", " ")
+                                .replace(/\b\w/g, char => char.toUpperCase());
+
+                            await type(`${label}: ${entryValue}`, field);
+                        }
+                    }
                 } else {
-                    await type(text, content);
+                    await type(String(item), listItem);
                 }
-
             }
-
         }
-
     }
-
-
 }
 
 function toTitle(key) {
@@ -186,7 +285,7 @@ function toTitle(key) {
     if(key == "overview") {
         return "Overview";
     } else if(key == "discussion_points") {
-        return "Key Discussions & Points";
+        return "Key Discussions Points";
     } else if(key == "decisions") {
         return "Decisions";
     } else if(key == "tasks_and_deadlines") {
@@ -197,15 +296,17 @@ function toTitle(key) {
 
 function type(text, container) {
     return new Promise((resolve) => {
+        container.textContent = "";
         let index = 0;
+
         const interval = setInterval(() => {
-            if(index < text.length) {
+            if (index < text.length) {
                 container.textContent += text[index];
                 index++;
             } else {
                 clearInterval(interval);
                 resolve();
             }
-        }, 100);
+        }, 30);
     });
 }

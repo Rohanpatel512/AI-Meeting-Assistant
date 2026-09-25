@@ -305,6 +305,10 @@ body {
     overflow-y: auto;
 }
 
+.summary-item {
+  margin-bottom: 12px; 
+}
+
 @media (max-width: 1000px) {
 
     .meeting-container {
