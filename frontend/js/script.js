@@ -4,7 +4,11 @@ const fileInput = document.querySelector("#file-hidden-input");
 const fileContent = document.querySelector(".file-content");
 const removeBtn = document.querySelector(".remove-btn");
 const summaryOutput = document.querySelector(".summary-container");
+const pdfButton = document.querySelector(".pdf-button");
 const API_BASED_URL = window.APP_CONFIG?.API_BASE_URL ?? "";
+let meetingSummary = null;
+
+import { generatePDF } from "./pdf.js";
 
 /*
 const testResponse = {
@@ -93,6 +97,9 @@ window.addEventListener('load', () => {
 });
 */
 
+pdfButton.addEventListener("click", () => {
+    generatePDF(meetingSummary);
+})
 
 uploadBtn.addEventListener("click", () => {
     fileInput.click();
@@ -128,7 +135,7 @@ async function sendFile(file) {
     if(!file) {
         return;
     }
-
+    
     const formData = new FormData();
     formData.append("file", file)
 
@@ -139,6 +146,8 @@ async function sendFile(file) {
         });
 
         const data = await response.json();
+
+        meetingSummary = data
         
         displayResponse(data);
 
@@ -146,6 +155,7 @@ async function sendFile(file) {
     } catch(error) {
         alert("Error sending file to server: ", error)
     }
+
     
     // Get the size of the file 
     const size = (file.size / (1024 * 1024)).toFixed(2);
