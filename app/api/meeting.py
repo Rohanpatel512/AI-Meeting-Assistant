@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from app.services.meeting_service import summarize
 from docx import Document 
+from app.services.transcript_preprocess import preprocess_text
 
 meeting_router = APIRouter(prefix="/meeting", tags=["Meeting"])
 
@@ -41,6 +42,9 @@ async def summarize_meeting(file: UploadFile):
             status_code=400,
             detail="No text found in file"
         )
+
+    # Preprocess the meeting text 
+    meeting_text = preprocess_text(meeting_text)
     
     # Set up call to summarize meeting text
     summarized_meeting = summarize(meeting_text)

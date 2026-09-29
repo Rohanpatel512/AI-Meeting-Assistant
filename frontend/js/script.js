@@ -5,8 +5,11 @@ const fileContent = document.querySelector(".file-content");
 const removeBtn = document.querySelector(".remove-btn");
 const summaryOutput = document.querySelector(".summary-container");
 const pdfButton = document.querySelector(".pdf-button");
+const copyButton = document.querySelector(".copy-button");
+const status_text = document.querySelector(".status-text");
 const API_BASED_URL = window.APP_CONFIG?.API_BASE_URL ?? "";
 let meetingSummary = null;
+let uploadedFileTimes = [];
 
 import { generatePDF } from "./pdf.js";
 
@@ -92,10 +95,23 @@ const testResponse = {
     ]
 };
 
+
 window.addEventListener('load', () => {
     displayResponse(testResponse);
 });
 */
+
+copyButton.addEventListener("click", async () => {
+    const text = summaryOutput.innerText;
+
+    try {
+        await navigator.clipboard.writeText(text);
+        copyButton.textContent = "Copied!";
+        setTimeout(() => copyButton.textContent = "Copy", 2000);
+    } catch(error) {
+        console.error("Failed to copy to clipboard");
+    }
+});
 
 pdfButton.addEventListener("click", () => {
     generatePDF(meetingSummary);
@@ -130,16 +146,19 @@ removeBtn.addEventListener('click', () => {
     child.remove();
 });
 
-async function sendFile(file) {
+setInterval(updateUploadTime, 60000);
 
+async function sendFile(file) {
+    updateStatusMessage("Uploading file...");
     if(!file) {
         return;
     }
-    
+
     const formData = new FormData();
     formData.append("file", file)
 
     try {
+        updateStatusMessage("Analyzing transcript...");
         const response = await fetch(`${API_BASED_URL}/meeting/summarize`, {
             method: "POST",
             body: formData
@@ -147,13 +166,21 @@ async function sendFile(file) {
 
         const data = await response.json();
 
+        if (!response.ok) {
+            throw new Error(data.detail || "An error occurred while processing the transcript.");
+        }
+
+        updateStatusMessage("Generating Summary...");
+    
         meetingSummary = data
         
-        displayResponse(data);
+        await displayResponse(data);
+        updateStatusMessage("");
 
         
     } catch(error) {
-        alert("Error sending file to server: ", error)
+        updateStatusMessage("");
+        alert(error.message);
     }
 
     
@@ -164,35 +191,34 @@ async function sendFile(file) {
     const timeUploaded = new Date();
 
     // Display the file that was uploaded to user 
-    displayUploadedFile(size, type, name, getTimeAgo(timeUploaded));
+    uploadedFileTimes.push([size, timeUploaded.getMinutes()]);
+    displayUploadedFile(size, type, name, "Uploaded just now");
 
 }
 
-function getTimeAgo(timeUploaded) {
-    const seconds = Math.floor((Date.now() - timeUploaded.getTime()) / 1000);
+function updateUploadTime() {
 
-    if(seconds < 60) {
-        return "Uploaded just now";
+    const currentTime = new Date().getMinutes();
+
+    if(uploadedFileTimes.length == 0) {
+        return;
     }
 
-    const minutes = Math.floor(seconds / 60);
+    for(var i = 0; i < uploadedFileTimes.length; i++) {
+        let diff = currentTime - uploadedFileTimes[i][1];
+        let size = uploadedFileTimes[i][0];
 
-    if(minutes < 60) {
-        return `Uploaded ${minutes} minutes${minutes == 1 ? "": "s"} ago`
+        if(diff % 60 == 0) {
+
+            let time = `Uploaded ${diff / 60} hour${diff == 1 ? "": "s"} ago`;
+            fileContent.children[i].children[1].children[1].textContent = `${size} MB • ${time}`;
+
+        } else if(diff < 60) {
+
+            let time = `Uploaded ${diff} minute${diff == 1 ? "": "s"} ago`;
+            fileContent.children[i].children[1].children[1].textContent = `${size} MB • ${time}`;
+        }
     }
-
-    const hours = Math.floor(minutes / 60);
-
-    if(hours < 24) {
-        return `Uploaded ${hours} hours${hours == 1 ? "": "s"} ago`
-    }
-
-    const days = Math.floor(hours / 24);
-
-    if(days >= 1) {
-        return `Uploaded ${days} days${days == 1 ? "": "s"} ago`
-    }
-
 
 }
 
@@ -319,4 +345,8 @@ function type(text, container) {
             }
         }, 30);
     });
+}
+
+function updateStatusMessage(statusText) {
+    status_text.innerText = statusText;
 }
