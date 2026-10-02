@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from app.services.meeting_service import summarize
 from docx import Document 
 from app.services.transcript_preprocess import preprocess_text
+from app.middleware.rate_limiter import run_rate_limiter
 
 meeting_router = APIRouter(prefix="/meeting", tags=["Meeting"])
 
@@ -43,6 +44,17 @@ async def summarize_meeting(file: UploadFile):
             detail="No text found in file"
         )
 
+    # Get the file size in MB to ensure it hasn't surpassed limit 
+    size_in_mb = file.size / (1024 * 1024)
+
+    # Run the rate limiter
+    data = run_rate_limiter(size_in_mb, meeting_text) 
+    if data["message"] != "":
+        raise HTTPException(
+            status_code=401,
+            detail=data["message"]
+        )
+
     # Preprocess the meeting text 
     meeting_text = preprocess_text(meeting_text)
     
@@ -51,11 +63,3 @@ async def summarize_meeting(file: UploadFile):
     
     return summarized_meeting
 
-
-@meeting_router.post("/analyze")
-async def analyze_meeting():
-    pass 
-
-@meeting_router.get("/{meeting_id}")
-async def get_meeting(meeting_id: str):
-    pass 

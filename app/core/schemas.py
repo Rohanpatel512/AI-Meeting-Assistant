@@ -18,4 +18,17 @@ class MeetingNotes(BaseModel):
     discussion_points: List[DiscussionPoint] = Field(description="Key Discussion Points")
     tasks_and_deadlines: List[Task] = Field(description="Tasks & Deadlines")
     decisions: List[Decision] = Field(description="Important Descisions Made")
-    
+
+## ===================== ## 
+## Authentication Models ##
+## ====================== ## 
+
+class loginPayload(BaseModel):
+    email: str
+    password: str 
+
+class signupPayload(BaseModel):
+    name: str 
+    email: str 
+    password: str 
+    confirm_password: str 

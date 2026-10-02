@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .env
 node_modules/
+dummy_transcript.txt
+dummy_transcript_2.txt
