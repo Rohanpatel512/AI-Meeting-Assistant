@@ -7,7 +7,9 @@ const summaryOutput = document.querySelector(".summary-container");
 const pdfButton = document.querySelector(".pdf-button");
 const copyButton = document.querySelector(".copy-button");
 const status_text = document.querySelector(".status-text");
+const summarizeBtn = document.querySelector(".summarize-btn");
 const API_BASED_URL = window.APP_CONFIG?.API_BASE_URL ?? "";
+let file = null;
 let meetingSummary = null;
 let uploadedFileTimes = [];
 
@@ -122,7 +124,16 @@ uploadBtn.addEventListener("click", () => {
 });
 
 fileInput.addEventListener("change", () => {
-    sendFile(fileInput.files[0]);
+    file = fileInput.files[0];
+    // Get the size of the file 
+    const size = (file.size / (1024 * 1024)).toFixed(2);
+    const type = file.name.split(".")[2];
+    const name = file.name;
+    const timeUploaded = new Date();
+
+    // Display the file that was uploaded to user 
+    uploadedFileTimes.push([size, timeUploaded.getMinutes()]);
+    displayUploadedFile(size, type, name, "Uploaded just now");
 });
 
 uploadBox.addEventListener('dragover', (e) => {
@@ -137,7 +148,16 @@ uploadBox.addEventListener('dragleave', (e) => {
 
 uploadBox.addEventListener('drop', (e) => {
     e.preventDefault();
-    sendFile(e.dataTransfer.files[0]);
+    file = e.dataTransfer.files[0];
+
+    const size = (file.size / (1024 * 1024)).toFixed(2);
+    const type = file.name.split(".")[2];
+    const name = file.name;
+    const timeUploaded = new Date();
+
+    // Display the file that was uploaded to user 
+    uploadedFileTimes.push([size, timeUploaded.getMinutes()]);
+    displayUploadedFile(size, type, name, "Uploaded just now");
     uploadBox.style.borderColor = '#cfd4e3';
 });
 
@@ -145,6 +165,15 @@ removeBtn.addEventListener('click', () => {
     const child = fileContent.children[0];
     child.remove();
 });
+
+summarizeBtn.addEventListener("click", () => {
+    if(!file) {
+        alert("Please upload a file before summarizing.");
+        return;
+    }
+
+    sendFile(file);
+})
 
 setInterval(updateUploadTime, 60000);
 
@@ -158,9 +187,16 @@ async function sendFile(file) {
     formData.append("file", file)
 
     try {
+        const refreshOk = await ensureSessionFresh();
+        if(!refreshOk) {
+            window.location.href = "index.html";
+            return;
+        }
+
         updateStatusMessage("Analyzing transcript...");
         const response = await fetch(`${API_BASED_URL}/meeting/summarize`, {
             method: "POST",
+            credentials: 'include',
             body: formData
         });
 
@@ -171,29 +207,35 @@ async function sendFile(file) {
         }
 
         updateStatusMessage("Generating Summary...");
-    
+
         meetingSummary = data
-        
+
         await displayResponse(data);
         updateStatusMessage("");
 
-        
     } catch(error) {
         updateStatusMessage("");
         alert(error.message);
     }
 
-    
-    // Get the size of the file 
-    const size = (file.size / (1024 * 1024)).toFixed(2);
-    const type = file.name.split(".")[2];
-    const name = file.name;
-    const timeUploaded = new Date();
+}
 
-    // Display the file that was uploaded to user 
-    uploadedFileTimes.push([size, timeUploaded.getMinutes()]);
-    displayUploadedFile(size, type, name, "Uploaded just now");
+async function ensureSessionFresh() {
+    try {
+        const response = await fetch(`${API_BASED_URL}/user/refresh`, {
+            method: "POST",
+            credentials: 'include'
+        });
 
+        if (!response.ok) {
+            return false;
+        }
+
+        return true;
+    } catch (error) {
+        console.error("Session refresh check failed:", error);
+        return false;
+    }
 }
 
 function updateUploadTime() {

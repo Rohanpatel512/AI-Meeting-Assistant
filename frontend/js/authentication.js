@@ -25,6 +25,7 @@ if (loginButton) {
                 headers: {
                     "Content-Type": "application/json"
                 },
+                credentials: "include",
                 body: credentials
             });
 
@@ -63,6 +64,7 @@ if (signupButton) {
                 headers: {
                     "Content-Type": "application/json"
                 },
+                credentials: "include",
                 body: credentials
             });
 

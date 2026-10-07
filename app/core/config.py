@@ -7,6 +7,8 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 LLM_API_KEY = os.getenv("LLM_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
+JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
 
 MAX_FILE_SIZE_MB = os.getenv("MAX_FILE_SIZE_MB")
 TOTAL_FILE_SIZE_MB = os.getenv("TOTAL_FILE_SIZE_MB")

@@ -1,10 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request, Response
 from app.core.schemas import loginPayload, signupPayload
 from app.database import models 
 from app.auth.validator import is_valid_email, check_password_strength
-from app.auth.security import hash_password, verify_password
+from app.auth.security import hash_password, verify_password, create_access_token, refresh_access_token
 from app.database.database import SessionLocal
 from sqlalchemy import select 
+from app.core.config import JWT_SECRET, JWT_ALGORITHM
+from datetime import datetime, timezone, timedelta
+import jwt 
 
 user_router = APIRouter(prefix="/user", tags=["Authentication"])
 
@@ -46,16 +49,21 @@ async def signup(payload: signupPayload):
         db.add(user)
         db.commit()
 
+        usage = models.Usage(user_id=user.id, total_file_size=0, summary_amount=0)
+        db.add(usage)
+        db.commit()
+
         db.refresh(user)
-        user_id = user.id
+        db.refresh(usage)
+
     finally:
         db.close()
 
-    return {"message": "User created successfully", "user_id": user_id}
+    return {"message": "User created successfully"}
 
 
 @user_router.post("/login")
-async def login(payload: loginPayload):
+async def login(payload: loginPayload, response: Response):
 
     # Check if either email or password are empty
     if not payload.email or not payload.password:
@@ -73,8 +81,59 @@ async def login(payload: loginPayload):
             raise HTTPException(status_code=401, detail="Invalid password or user does not exist")
             return {"message": "Invalid password or user does not exist"}
 
-        user_id = user.id
+        access_token = create_access_token(user.id)
+
+        response.set_cookie( 
+            key="access_token", 
+            value=access_token, 
+            httponly=True, 
+            secure=False, # Set to false on local development, change to true in production 
+            samesite="lax", 
+            max_age=3600, 
+            path="/" 
+        )
+
+       
     finally:
         db.close()
 
-    return {"message": "Login successful", "user_id": user_id}
+
+    return {"message": "Login successful"}
+
+
+
+@user_router.post("/refresh")
+async def refresh(request: Request, response: Response):
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Refresh token missing")
+
+    try:
+        payload = jwt.decode(access_token, JWT_SECRET, algorithms=[JWT_ALGORITHM], options={"verify_exp": False})
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    user_id = payload.get("sub")
+    exp_time = payload.get("exp")
+    current_time = int(datetime.now(timezone.utc).timestamp())
+
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    if not exp_time:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    if int(exp_time) <= current_time:
+        new_access_token = create_access_token(int(user_id))
+        response.set_cookie(
+            key="access_token",
+            value=new_access_token,
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            max_age=3600,
+            path="/"
+        )
+        return {"message": "token refreshed"}
+
+    return {"message": "token is still valid"}
