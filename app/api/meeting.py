@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from app.services.meeting_service import summarize
 from docx import Document 
-from app.services.transcript_preprocess import preprocess_text
+from app.services.transcript_preprocess import preprocess_transcript
 from app.middleware.rate_limiter import run_rate_limiter
 import jwt 
 from app.core.config import JWT_SECRET, JWT_ALGORITHM
+from app.utils.metrics import evaluate_token_usage
 
 meeting_router = APIRouter(prefix="/meeting", tags=["Meeting"])
 
@@ -46,9 +47,9 @@ async def summarize_meeting(file: UploadFile, request: Request):
     # Get file name 
     filename = file.filename or ""
 
-    # Check the file type. Only .txt and .docx are supported for now
-    if not filename.lower().endswith((".txt", ".docx")):
-        raise HTTPException(status_code=415, detail="File type not supported")
+    # Check the file type. Only .vtt are supported for now
+    if not filename.lower().endswith((".vtt")):
+        raise HTTPException(status_code=415, detail="File type not supported. Only .vtt files are supported for now.")
 
     # Extract all the text from the file
     content = await file.read()
@@ -59,16 +60,20 @@ async def summarize_meeting(file: UploadFile, request: Request):
             detail="File contents empty"
         )
 
-    if filename.lower().endswith(".txt"):
-        meeting_text = content.decode("utf-8")
-    else:
-        document = Document(file.file)
-        meeting_text = " ".join(paragraph.text for paragraph in document.paragraphs if paragraph.text.strip())
+    if filename.lower().endswith(".vtt"):
+        try:
+            meeting_text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Error decoding file contents. Please ensure the file is a valid .vtt file."
+            )
+
         
-    if not meeting_text:
+    if not meeting_text.lstrip("\ufeff").startswith("WEBVTT"):
         raise HTTPException(
             status_code=400,
-            detail="No text found in file"
+            detail="Invalid VTT file."
         )
 
     # Get the file size in MB to ensure it hasn't surpassed limit 
@@ -78,16 +83,18 @@ async def summarize_meeting(file: UploadFile, request: Request):
     data = run_rate_limiter(size_in_mb, meeting_text, user_id) 
     if data["message"] != "":
         raise HTTPException(
-            status_code=401,
+            status_code=429,
             detail=data["message"]
         )
         return
 
     # Preprocess the meeting text 
-    meeting_text = preprocess_text(meeting_text)
+    meeting_text_preprocessed = preprocess_transcript(meeting_text)
+
+    evaluate_token_usage(meeting_text, meeting_text_preprocessed)
     
     # Set up call to summarize meeting text
-    summarized_meeting = summarize(meeting_text)
+    summarized_meeting = summarize(meeting_text_preprocessed)
     
     return summarized_meeting
 

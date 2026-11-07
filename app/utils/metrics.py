@@ -12,8 +12,12 @@ def evaluate_token_usage(raw_text: str, preprocessed_text: str, model_name: str 
     Returns:
         None 
     """
-    # Get the tokenizer for the specified model
-    encoding = tiktoken.encoding_for_model(model_name)
+
+    try:
+        # Get the tokenizer for the specified model
+        encoding = tiktoken.encoding_for_model(model_name)
+    except KeyError:
+        encoding = tiktoken.get_encoding("o200k_harmony")
 
     # Calculate token counts
     raw_tokens = len(encoding.encode(raw_text))
@@ -30,6 +34,3 @@ def evaluate_token_usage(raw_text: str, preprocessed_text: str, model_name: str 
     print(f"  • Total Cost Reduction: {reduction_percentage:.2f}%")
     
     return reduction_percentage  
-
-
-  

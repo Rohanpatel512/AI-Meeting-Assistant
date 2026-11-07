@@ -1,6 +1,6 @@
 # AI Meeting Assistant
 
-An AI-powered web application that transforms meeting transcripts into structured, actionable meeting notes. Upload a `.txt` or `.docx` transcript to extract key discussion points, decisions, and action items with deadlines.
+An AI-powered web application that transforms meeting transcripts into structured, actionable meeting notes. Upload a `.vtt` transcript to extract key discussion points, decisions, and action items with deadlines.
 
 The application combines a FastAPI backend with an LLM-powered summarization pipeline and an interactive web interface, making meeting outcomes easier to review and act on.
 
@@ -13,7 +13,7 @@ The application combines a FastAPI backend with an LLM-powered summarization pip
 - **LLM integration:** Uses Groq's API with the `openai/gpt-oss-20b` model.
 
 ### Document Processing
-- **Multiple file formats:** Accepts `.txt` and `.docx` meeting transcripts.
+- **Multiple file formats:** Accepts `.vtt` meeting transcripts.
 - **Transcript extraction:** Extracts text from uploaded documents before processing.
 - **Input validation:** Checks supported file formats and handles empty or invalid transcript content.
 - **Transcript preprocessing:** Cleans transcript text before summarization, with additional preprocessing improvements under development.
