@@ -12,98 +12,13 @@ const API_BASED_URL = window.APP_CONFIG?.API_BASE_URL ?? "";
 let file = null;
 let meetingSummary = null;
 let uploadedFileTimes = [];
+let isSummaryLocked = false;
 
 import { generatePDF } from "./pdf.js";
 
-/*
-const testResponse = {
-    decisions: [
-        {
-            text: "Marketing team will avoid using the analytics tab until backend fix.",
-            rationale: "Analytics tab likely to cause timeout due to ongoing database refactor."
-        },
-        {
-            text: "Code freeze is set for September 25th.",
-            rationale: "To allow full week of QA before release."
-        },
-        {
-            text: "Ad sets launch on October 1st if budget approved.",
-            rationale: "Maintaining launch schedule."
-        },
-        {
-            text: "Status check meeting on Friday.",
-            rationale: "To review progress."
-        },
-        {
-            text: "Critical bugs will be logged in Jira with the Launch-Blocker tag.",
-            rationale: "Ensure visibility to backend team."
-        }
-    ],
-
-    discussion_points: [
-        {
-            text: "Beta build status: stable core workflow, new dashboard, analytics tab problematic; fix expected by Friday."
-        },
-        {
-            text: "Marketing campaign readiness: ad copy, landing page, need sign-off by Thursday; ad launch on October 1st."
-        },
-        {
-            text: "Finance approval status: request submitted Monday, finance out until Wednesday, follow up Thursday."
-        },
-        {
-            text: "Code freeze target: September 25th; QA testing week; public release October 1st."
-        },
-        {
-            text: "Bug logging protocol: use Jira Launch-Blocker tag for critical issues found during demo recording."
-        },
-        {
-            text: "Next status check meeting scheduled for Friday."
-        }
-    ],
-
-    overview: "Team aligned on Q4 product launch, addressing beta build readiness, marketing campaign schedule, finance approval timeline, code freeze, bug logging protocol, and next status check.",
-
-    tasks_and_deadlines: [
-        {
-            task: "Fix analytics tab bug",
-            assignee: "Elena",
-            deadline: "Friday"
-        },
-        {
-            task: "Follow up with finance for budget approval",
-            assignee: "James",
-            deadline: "Thursday"
-        },
-        {
-            task: "Implement code freeze",
-            assignee: null,
-            deadline: "2026-09-25"
-        },
-        {
-            task: "Record onboarding flow and main dashboard demos, avoid analytics tab",
-            assignee: "Marketing team",
-            deadline: "End of week"
-        },
-        {
-            task: "Log critical bugs in Jira with Launch-Blocker tag",
-            assignee: null,
-            deadline: "Immediate"
-        },
-        {
-            task: "Schedule status check meeting on Friday",
-            assignee: "Sarah",
-            deadline: "Friday"
-        }
-    ]
-};
-
-
-window.addEventListener('load', () => {
-    displayResponse(testResponse);
-});
-*/
-
 copyButton.addEventListener("click", async () => {
+    if (!meetingSummary || isSummaryLocked) return;
+
     const text = summaryOutput.innerText;
 
     try {
@@ -116,14 +31,17 @@ copyButton.addEventListener("click", async () => {
 });
 
 pdfButton.addEventListener("click", () => {
+    if (!meetingSummary || isSummaryLocked) return;
     generatePDF(meetingSummary);
 })
 
 uploadBtn.addEventListener("click", () => {
+    if (isSummaryLocked) return;
     fileInput.click();
 });
 
 fileInput.addEventListener("change", () => {
+    if (isSummaryLocked) return;
     file = fileInput.files[0];
     // Get the size of the file 
     const size = (file.size / (1024 * 1024)).toFixed(2);
@@ -134,19 +52,33 @@ fileInput.addEventListener("change", () => {
     // Display the file that was uploaded to user 
     uploadedFileTimes.push([size, timeUploaded.getMinutes()]);
     displayUploadedFile(size, type, name, "Uploaded just now");
+    refreshActionState();
 });
 
 uploadBox.addEventListener('dragover', (e) => {
+    if (isSummaryLocked) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+    }
+
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     uploadBox.style.borderColor = '#000'
 });
 
 uploadBox.addEventListener('dragleave', (e) => {
+    if (isSummaryLocked) return;
     uploadBox.style.borderColor = '#cfd4e3'
 });
 
 uploadBox.addEventListener('drop', (e) => {
+    if (isSummaryLocked) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+    }
+
     e.preventDefault();
     file = e.dataTransfer.files[0];
 
@@ -159,20 +91,28 @@ uploadBox.addEventListener('drop', (e) => {
     uploadedFileTimes.push([size, timeUploaded.getMinutes()]);
     displayUploadedFile(size, type, name, "Uploaded just now");
     uploadBox.style.borderColor = '#cfd4e3';
+    refreshActionState();
 });
 
 removeBtn.addEventListener('click', () => {
+    if (isSummaryLocked) return;
     const child = fileContent.children[0];
     child.remove();
+    file = null;
+    refreshActionState();
 });
 
-summarizeBtn.addEventListener("click", () => {
+summarizeBtn.addEventListener("click", async () => {
+    if (isSummaryLocked) return;
+
     if(!file) {
         alert("Please upload a file before summarizing.");
         return;
     }
 
-    sendFile(file);
+    isSummaryLocked = true;
+    refreshActionState();
+    await sendFile(file);
 })
 
 setInterval(updateUploadTime, 60000);
@@ -180,6 +120,8 @@ setInterval(updateUploadTime, 60000);
 async function sendFile(file) {
     updateStatusMessage("Uploading file...");
     if(!file) {
+        isSummaryLocked = false;
+        refreshActionState();
         return;
     }
 
@@ -216,6 +158,9 @@ async function sendFile(file) {
     } catch(error) {
         updateStatusMessage("");
         alert(error.message);
+    } finally {
+        isSummaryLocked = false;
+        refreshActionState();
     }
 
 }
@@ -392,3 +337,22 @@ function type(text, container) {
 function updateStatusMessage(statusText) {
     status_text.innerText = statusText;
 }
+
+function refreshActionState() {
+    const hasSummary = Boolean(meetingSummary);
+    const canEditFile = !isSummaryLocked;
+
+    uploadBtn.disabled = !canEditFile;
+    fileInput.disabled = !canEditFile;
+    removeBtn.disabled = !canEditFile;
+    summarizeBtn.disabled = !canEditFile || !file;
+    pdfButton.disabled = !canEditFile || !hasSummary;
+    copyButton.disabled = !canEditFile || !hasSummary;
+
+    uploadBox.style.pointerEvents = canEditFile ? "auto" : "none";
+    uploadBox.style.opacity = canEditFile ? "1" : "0.7";
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+    refreshActionState();
+});
