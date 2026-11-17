@@ -3,7 +3,10 @@ from sentence_transformers import SentenceTransformer, util
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 from io import StringIO
+from app.services.chunker import token_aware_chunking
+#from chunker import token_aware_chunking
 import webvtt
+from wtpsplit import SaT
 
 ARTIFACTS = [
     "laughing",
@@ -26,6 +29,19 @@ ARTIFACTS = [
     "door closing"
 ]
 
+FILLERS = [
+    r"um+",
+    r"uh+",
+    r"er+",
+    r"ah+",
+    r"like",
+    r"you know",
+    r"i mean",
+    r"basically",
+    r"actually",
+    r"literally",
+]
+
 
 SIMILARITY_THRESHOLD = 0.65
 GREY_AREA_THRESHOLD = 0.53
@@ -36,7 +52,9 @@ cross_encoder = AutoModelForSequenceClassification.from_pretrained("cross-encode
 
 model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
-def preprocess_transcript(transcript: str) -> str:
+sat = SaT("sat-3l-sm")
+
+def preprocess_transcript(transcript: str) -> list:
     """
     Master orchestrator function that completely preprocesses the transcript and makes it 
     ready for LLM.
@@ -49,7 +67,7 @@ def preprocess_transcript(transcript: str) -> str:
     """
 
     speakers = identify_speakers(transcript)
-    segments = remove_cue_identifiers(transcript)
+    segments = extract_caption_segments(transcript)
 
     # Clean up each segment 
     segments = clean_segments(segments)
@@ -57,14 +75,55 @@ def preprocess_transcript(transcript: str) -> str:
     # Remove similar phrases 
     segments = remove_similar_phrases(segments)
 
+    pattern = r"\b(?:" + "|".join(FILLERS) + r")\b,?\s*"
+    
     if len(speakers) > 0:
         combined_speaker_dialects = combine_speaker_dialogues(speakers, segments)
-        transcript_preprocessed = create_final_transcript(combined_speaker_dialects, speakers, None)
+        preprocessed_text = create_final_transcript(combined_speaker_dialects, speakers)
+        chunks = token_aware_chunking(preprocessed_text, combined_speaker_dialects)
+        return chunks
     else:
-        transcript_preprocessed = " ".join(segments)
+        segments = reassemble_fragmented_phrases(segments)
+        for i in range(0, len(segments)):
+            segments[i] = re.sub(pattern, "", segments[i], flags=re.IGNORECASE)
 
-    return transcript_preprocessed
+        chunks = token_aware_chunking(None, segments)
+        return chunks
 
+
+def reassemble_fragmented_phrases(segments: list, threshold: float = 0.25) -> list: 
+    """
+    Repairs mid-phrase line breaks or false speech-to-text sentence
+    breaks.
+
+    args:
+        segments (list) - List of phrases spoken during meeting.
+    
+    returns:
+        None
+    """
+
+    new_segments = []
+    prev_segment = segments[0]
+
+    for i in range(1, len(segments)):
+        combined = f"{prev_segment} {segments[i]}"
+
+        sentences = [s.strip() for s in sat.split(combined, threshold=threshold) if s.strip()]
+
+        # If sentence is fragmented
+        if len(sentences) == 1:
+            prev_segment = sentences[0] 
+        else:
+            new_segments.extend(sentences[:-1])
+            prev_segment = sentences[-1]
+
+    if prev_segment:
+        new_segments.append(prev_segment)
+
+    return new_segments
+
+    
 def clean_segments(segments: list) -> list:
     """
     Clean up the phrases such as removing artificats, extra whitespaces, etc.
@@ -78,6 +137,8 @@ def clean_segments(segments: list) -> list:
 
     pattern = r'\[(?:' + '|'.join(map(re.escape, ARTIFACTS)) + r')\]'
 
+    filler_pattern = r"\b(?:" + "|".join(FILLERS) + r")\b,?\s*"
+
     for i in range(0, len(segments)):
         # Remove unecessary artifacts
         segments[i] = re.sub(pattern, '', segments[i])
@@ -86,6 +147,8 @@ def clean_segments(segments: list) -> list:
         segments[i] = re.sub(r'\s+', ' ', segments[i])
 
     return segments
+
+
 
 def create_final_transcript(combined_speaker_dialects: list, speakers: list) -> str:
     """
@@ -111,6 +174,7 @@ def create_final_transcript(combined_speaker_dialects: list, speakers: list) -> 
     return transcript_preprocessed
 
 
+
 def identify_speakers(transcript: str) -> list:
     """
     Identifies speaker for each line in the transcript and adds it to a list.
@@ -124,9 +188,11 @@ def identify_speakers(transcript: str) -> list:
 
     return re.findall(r'<v\s+([^>]+)>', transcript, flags=re.IGNORECASE)
 
+
+
 def combine_speaker_dialogues(speakers: list, segments: list) -> list:
     """
-    If two or more dialects come from the same speaker, it is combined into a 
+    If two or more consecutive dialects come from the same speaker, it is combined into a 
     single dialect.
 
     args:
@@ -157,20 +223,73 @@ def combine_speaker_dialogues(speakers: list, segments: list) -> list:
         combined_speaker_dialogues.append(f"{prev_speaker}[SEP] {phrase}")
 
     return combined_speaker_dialogues
+
+
+
+def strip_vtt_cue_identifiers(transcript: str) -> str:
+    """
+    Removes standalone cue identifiers that some platforms insert into VTT exports.
+    These are usually single-line numeric markers such as "1" or "001" and are not
+    spoken transcript content.
+    """
+
+    if not transcript or not isinstance(transcript, str):
+        return transcript
+
+    lines = transcript.splitlines()
+    cleaned_lines = []
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+
+        if stripped.upper() == 'WEBVTT':
+            cleaned_lines.append(line)
+            continue
+
+        if not stripped:
+            cleaned_lines.append(line)
+            continue
+
+        next_line = ""
+        for next_candidate in lines[i + 1:]:
+            if next_candidate.strip():
+                next_line = next_candidate.strip()
+                break
+
+        is_cue_identifier = bool(re.fullmatch(r'(?:\d+|[A-Za-z0-9_-]+)', stripped)) and (
+            next_line.startswith('<v ') or
+            next_line.startswith('<c.') or
+            re.match(r'^\d{2,}:\d{2}:\d{2}\.\d{3}\s*-->', next_line)
+        )
+
+        if is_cue_identifier:
+            continue
+
+        if re.fullmatch(r'\d+', stripped):
+            continue
+
+        cleaned_lines.append(line)
+
+    return '\n'.join(cleaned_lines)
+
+
     
 
-def remove_cue_identifiers(transcript: str) -> str:
+def extract_caption_segments(transcript: str) -> str:
     """
-    Removes cue identifiers from the transcript.
+    Extracts dialogue segments from a WebVTT transcript.
 
     args:
         transcript (str): The transcript to be cleaned.
     
     parameters:
-        transcript_cleaned (str): The transcript with cue identifiers removed.
+        segment (list): A list of extracted caption segments.
     """
 
+    transcript = strip_vtt_cue_identifiers(transcript)
+    
     vtt = webvtt.WebVTT.from_buffer(StringIO(transcript))
+ 
     segments = []
 
     for caption in vtt:
@@ -178,6 +297,9 @@ def remove_cue_identifiers(transcript: str) -> str:
             segments.append(caption.text.strip())
     
     return segments
+    
+
+
 
 def remove_similar_phrases(segments: list) -> list:
     """
@@ -195,82 +317,144 @@ def remove_similar_phrases(segments: list) -> list:
     if len(segments) == 0:
         return []
 
-    for i in range(len(segments)):
+    embeddings = model.encode(segments, convert_to_tensor=True, batch_size=64, show_progress_bar=False)
+
+    agreement_safelist = r'\b(yeah|yes|ok|okay|no|sure|agree|makes\ssense|sounds\sgood|cool|right)\b'
+
+    for i in range(0, len(segments)):
         if i in duplicate_indices:
             continue 
 
-        phrase_embedding = model.encode(segments[i], convert_to_tensor=True)
+        # Do not deduplicate short agreement phrases
+        if len(segments[i].split()) <= 3 and re.search(agreement_safelist, segments[i], re.I):
+            continue
 
-        for j in range(i + 1, min(i + SLIDING_WINDOW, len(segments))):
+        
+        end_window = min(i + SLIDING_WINDOW, len(segments))
+
+        if i + 1 >= end_window:
+            continue 
+
+        similarity_matrix = util.pytorch_cos_sim(embeddings[i], embeddings[i + 1:end_window])
+        similarity_scores = similarity_matrix[0] if similarity_matrix.ndim > 1 else similarity_matrix
+
+        cross_encoder_pairs = []
+        cross_encoder_indices = []
+
+        for offset_idx, similarity_score in enumerate(similarity_scores):
+            j = i + 1 + offset_idx 
             if j in duplicate_indices:
                 continue 
 
-            comparison_embedding = model.encode(segments[j], convert_to_tensor=True)
+            similarity_value = float(similarity_score)
 
-            similarity_score = util.pytorch_cos_sim(phrase_embedding, comparison_embedding).item()
+            if similarity_value > SIMILARITY_THRESHOLD: 
+                duplicate_indices.add(j) 
+                continue 
+                
+            if similarity_value > GREY_AREA_THRESHOLD: 
+                cross_encoder_pairs.append([segments[i], segments[j]])
+                cross_encoder_indices.append(j)
 
-            if similarity_score > SIMILARITY_THRESHOLD:
-                duplicate_indices.add(j)
+        if cross_encoder_pairs:
+            with torch.no_grad():
+                inputs = tokenizer(cross_encoder_pairs, padding=True, truncation=True, return_tensors="pt")
+                outputs = cross_encoder(**inputs)
+                logits = outputs.logits
 
-            if similarity_score > GREY_AREA_THRESHOLD:
-                pair = [segments[i], segments[j]]
-                with torch.no_grad():
-                    inputs = tokenizer(pair, padding=True, truncation=True, return_tensors="pt")
-                    outputs = cross_encoder(**inputs)
-                    logits = outputs.logits.squeeze(dim=1)
-
-                if logits[0] > logits[1]:
+            for index, j in enumerate(cross_encoder_indices):
+                if logits[index].argmax().item() == 1:
                     duplicate_indices.add(j)
 
     filtered_segments = [segments[i] for i in range(len(segments)) if i not in duplicate_indices]
 
-    return filtered_segments
+    return filtered_segments 
+
+
+            
 
 
 
 if __name__ == "__main__":
     text = """WEBVTT
+Kind: captions
+Language: en
 
-00:00:01.120 --> 00:00:04.550
-Good morning, everyone. Let's get the weekly sync started.
+1
+00:00:01.120 --> 00:00:04.450
+Okay, uh, thanks everyone for hopping on the call today.
 
-00:00:04.550 --> 00:00:09.180
-I know a few people are still <i>jumping on</i>, but we have a tight schedule.
+2
+00:00:04.450 --> 00:00:08.900
+So, the main thing we need to lock down is the Q4 launch
 
-00:00:09.430 --> 00:00:13.800
-Hey Sarah, sorry to interrupt, but is the quarterly report slide deck updated yet?
+3
+00:00:08.900 --> 00:00:12.310
+timeline for the mobile app redesign.
 
-00:00:14.200 --> 00:00:18.050
-Yes, David, it is. I pinned the link in the main Slack channel.
+4
+00:00:13.050 --> 00:00:16.800
+Yeah, so I was looking at the backend tickets this morning,
 
-00:00:18.410 --> 00:00:23.900
->Awesome, thanks. [coughing] Just wanted to make sure before the client call.
+5
+00:00:16.800 --> 00:00:21.150
+and, um, the authentication migration is taking longer than expected.
 
-001
-00:00:24.150 --> 00:00:26.500
->No problem. Elena, do you want to give the engineering update?
+6
+00:00:21.150 --> 00:00:24.600
+We might need until next Wednesday just to finish QA.
 
-00:00:26.900 --> 00:00:31.330
-Sure. So, the database migration went live at 2:00 AM on Sunday.
+7
+00:00:25.200 --> 00:00:28.750
+Wait, next Wednesday? That pushes us right up against
 
-00:00:31.330 --> 00:00:35.400
-We experienced about ten minutes of <b>unplanned downtime</b>,
-but everything is stable now.
+8
+00:00:28.750 --> 00:00:31.900
+the marketing freeze on <i>November 20th</i>.
 
-00:00:36.000 --> 00:00:39.120
-Wow, only ten minutes? That is a massive win.
+9
+00:00:32.400 --> 00:00:36.100
+Can we decouple the auth update from the UI release?
 
-00:00:39.120 --> 00:00:41.850
-Yeah, we were expecting a lot worse. [laughter]
+10
+00:00:36.850 --> 00:00:40.200
+Uh, let me think. Technically yes, if we use the legacy
 
-00:00:42.200 --> 00:00:47.500
-Great job, Elena. Next up, let's talk about the Q4 hiring budget.
+11
+00:00:40.200 --> 00:00:43.950
+endpoints for version 2.1, then design can ship on schedule.
 
-00:00:48.000 --> 00:00:52.300
-We have approval for two new senior backend roles and one frontend role.
+12
+00:00:44.500 --> 00:00:48.300
+Let's do that. Sarah, can you update the Jira board today
 
-00:00:52.600 --> 00:00:54.990
-I'll drop the job descriptions in the email thread later today.
+13
+00:00:48.300 --> 00:00:51.850
+to move the auth tickets to the 2.2 sprint?
+
+14
+00:00:52.100 --> 00:00:54.400
+Yep, on it. I'll send a Slack update once it's done.
+
+15
+00:00:55.000 --> 00:00:58.200
+Awesome. Also, don't forget we need final sign-off from legal
+
+16
+00:00:58.200 --> 00:01:01.750
+on the updated privacy policy before we submit to the App Store.
+
+17
+00:01:02.300 --> 00:01:05.600
+I already emailed them yesterday, so we should hear back by Friday.
+
+18
+00:01:06.100 --> 00:01:09.000
+Perfect. Alright, let's wrap up early and get back to it.
 """
+
+
+
     #preprocess_transcript(text)
-    print(preprocess_transcript(text))
+    #print(preprocess_transcript(text))
+

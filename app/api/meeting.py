@@ -89,12 +89,12 @@ async def summarize_meeting(file: UploadFile, request: Request):
         return
 
     # Preprocess the meeting text 
-    meeting_text_preprocessed = preprocess_transcript(meeting_text)
-
-    evaluate_token_usage(meeting_text, meeting_text_preprocessed)
+    chunked_data = preprocess_transcript(meeting_text)
     
     # Set up call to summarize meeting text
-    summarized_meeting = summarize(meeting_text_preprocessed)
+    summarized_meeting, prompt = await summarize(chunked_data)
+
+    evaluate_token_usage(meeting_text, chunked_data, prompt)
     
     return summarized_meeting
 
