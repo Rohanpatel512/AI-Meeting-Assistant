@@ -111,7 +111,8 @@ summarizeBtn.addEventListener("click", async () => {
     }
 
     isSummaryLocked = true;
-    refreshActionState();
+    lockButtons(true);
+    console.log("Locked: ", summarizeBtn.disabled);
     await sendFile(file);
 })
 
@@ -134,6 +135,7 @@ async function sendFile(file) {
             window.location.href = "index.html";
             return;
         }
+
 
         updateStatusMessage("Analyzing transcript...");
         const response = await fetch(`${API_BASED_URL}/meeting/summarize`, {
@@ -160,6 +162,7 @@ async function sendFile(file) {
         alert(error.message);
     } finally {
         isSummaryLocked = false;
+        lockButtons(false);
         refreshActionState();
     }
 
@@ -332,6 +335,24 @@ function type(text, container) {
             }
         }, 30);
     });
+}
+
+function lockButtons(disabled) {
+
+    document.body.classList.toggle("summary-locking", disabled);
+
+
+    uploadBtn.disabled = disabled;
+    fileInput.disabled = disabled; 
+    removeBtn.disabled = disabled; 
+    summarizeBtn.disabled = disabled; 
+    pdfButton.disabled = disabled; 
+    copyButton.disabled = disabled; 
+
+
+    uploadBox.style.pointerEvents = disabled ? "none" : "auto";
+    uploadBox.style.opacity = disabled ? "0.7" : "1";
+
 }
 
 function updateStatusMessage(statusText) {

@@ -80,7 +80,7 @@ async def summarize_meeting(file: UploadFile, request: Request):
     size_in_mb = file.size / (1024 * 1024)
 
     # Run the rate limiter
-    data = run_rate_limiter(size_in_mb, meeting_text, user_id) 
+    data = run_rate_limiter(size_in_mb, user_id) 
     if data["message"] != "":
         raise HTTPException(
             status_code=429,

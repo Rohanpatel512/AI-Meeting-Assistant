@@ -1,186 +1,137 @@
 # AI Meeting Assistant
 
-An AI-powered web application that transforms meeting transcripts into structured, actionable meeting notes. Upload a `.vtt` transcript to extract key discussion points, decisions, and action items with deadlines.
+AI Meeting Assistant is a full-stack application that converts meeting transcripts into structured, actionable notes. It uses FastAPI and a Groq-hosted language model to identify meeting overviews, discussion points, decisions, tasks, and deadlines.
 
-The application combines a FastAPI backend with an LLM-powered summarization pipeline and an interactive web interface, making meeting outcomes easier to review and act on.
+The project demonstrates practical applied AI integration, token-efficient transcript processing, authentication, database-backed usage controls, and an interactive frontend.
 
-## Features
+## Project Highlights
 
-### AI-Powered Meeting Summarization
-- **Structured meeting notes:** Generates meeting overviews, discussion points, tasks and deadlines, and decisions.
-- **Schema-validated output:** Uses Pydantic models to structure and validate LLM responses.
-- **Actionable insights:** Organizes meeting information into readable sections instead of returning an unstructured block of text.
-- **LLM integration:** Uses Groq's API with the `openai/gpt-oss-20b` model.
+- Processes `.vtt` meeting transcripts
+- Generates structured summaries with Pydantic schema validation
+- Removes transcript artifacts, filler language, and repetition
+- Uses semantic, topic-aware chunking for long transcripts
+- Consolidates chunk summaries into a deduplicated final result
+- Provides login and signup functionality with JWT authentication
+- Tracks user usage and applies file-size and summary limits
+- Displays summaries using an animated typewriter effect
+- Supports copying summaries and exporting PDFs
+- Locks summarization controls until the complete summary finishes rendering
 
-### Document Processing
-- **Multiple file formats:** Accepts `.vtt` meeting transcripts.
-- **Transcript extraction:** Extracts text from uploaded documents before processing.
-- **Input validation:** Checks supported file formats and handles empty or invalid transcript content.
-- **Transcript preprocessing:** Cleans transcript text before summarization, with additional preprocessing improvements under development.
+## Application Features
 
-### Interactive Web Interface
-- **Dynamic results rendering:** Renders structured meeting notes from the API response.
-- **Typewriter effect:** Animates the presentation of generated content.
-- **PDF export:** Exports generated meeting notes for offline access.
-- **Clipboard support:** Allows users to copy meeting notes.
-- **Authentication interface:** Includes login and signup pages.
+### Transcript Processing
 
-### Backend Engineering and Safeguards
-- **REST API:** Exposes FastAPI endpoints for meeting summarization and user operations.
-- **Request validation and error handling:** Handles unsupported uploads, invalid input, and unsuccessful API responses.
-- **Usage safeguards:** Includes configurable limits for request frequency, transcript length, file size, and generated output.
-- **Database layer:** Uses SQLAlchemy ORM models for user and usage data.
-- **Database migrations:** Uses Alembic to manage database schema changes.
-- **Modular architecture:** Separates API routes, authentication utilities, configuration, database models, and application services.
+The backend accepts WebVTT transcript files and validates their type and contents before processing. It:
 
-## Tech Stack
+- Identifies speaker labels when available
+- Removes artifacts and extra whitespace
+- Filters filler words and repeated phrases
+- Repairs fragmented phrases
+- Detects topic changes through semantic similarity
+- Divides transcripts into manageable chunks
 
-| Component | Technologies |
+### AI-Powered Summarization
+
+Groq’s `openai/gpt-oss-120b` model is integrated through Instructor to produce schema-validated JSON responses. Each transcript chunk is summarized separately, merged, and processed through a final consolidation pass.
+
+The output contains:
+
+- Meeting overview
+- Key discussion points
+- Tasks and deadlines
+- Decisions and supporting rationale
+
+### Authentication and Usage Controls
+
+Authentication uses bcrypt password hashing and JWT access tokens stored in HTTP-only cookies.
+
+Backend safeguards include:
+
+- Email and password validation
+- Duplicate-account prevention
+- Maximum upload size limits
+- Per-user file-size limits
+- Per-user summary limits
+- Session refresh and protected API endpoints
+
+### Interactive Frontend
+
+The frontend provides authentication pages and a meeting dashboard. During summarization, it displays processing status and disables uploading, removal, summarization, copying, and PDF export until the complete summary has finished rendering.
+
+## Technical Stack
+
+| Area | Technologies |
 |---|---|
 | Backend | Python, FastAPI |
-| LLM integration | Groq API, `openai/gpt-oss-20b` |
-| Data validation | Pydantic |
-| Document processing | Python, `python-docx` |
-| Database access | SQLAlchemy |
-| Database migrations | Alembic |
-| Authentication foundations | Password hashing with bcrypt, signup/login endpoints |
+| AI / LLM | Groq, Instructor, OpenAI GPT-OSS 120B |
+| Data Validation | Pydantic |
+| Database | SQLAlchemy, relational database models |
+| Database Migrations | Alembic |
+| Authentication | bcrypt, JWT, HTTP-only cookies |
+| Transcript Processing | WebVTT, Sentence Transformers, WtP-Split, tiktoken, Transformers |
 | Frontend | HTML, CSS, JavaScript |
-| Version control | Git, GitHub |
+| PDF Export | jsPDF |
 
-## Architecture
+## System Architecture
 
-The application separates HTTP request handling from document processing, LLM integration, and database operations.
-
-```text
-                 Web Frontend
-                      |
-                      v
-                FastAPI Backend
-                      |
-             +--------+--------+
-             |                 |
-             v                 v
-       User Endpoints    Meeting Endpoint
-                               |
-                               v
-                     File Validation
-                               |
-                               v
-                     Text Extraction
-                               |
-                               v
-                    Transcript Cleanup
-                               |
-                               v
-                     Groq LLM Request
-                               |
-                               v
-                    Pydantic Validation
-                               |
-                               v
-                     Structured Response
-                               |
-                               v
-                         Web Frontend
+```mermaid
+flowchart LR
+    A[User] --> B[Responsive Web Interface]
+    B --> C[FastAPI Application]
+    C --> D[Authentication and JWT Middleware]
+    C --> E[File and Usage Validation]
+    E --> F[WebVTT Processing]
+    F --> G[Semantic Cleaning and Chunking]
+    G --> H[Groq LLM with Instructor]
+    H --> I[Chunk Summaries]
+    I --> J[Pydantic Validation]
+    J --> K[Deduplicated Final Summary]
+    K --> B
 ```
 
-The frontend presents the generated notes and provides options to copy or export the results.
+## Engineering Highlights
 
-## Project Structure
+- **Structured AI output:** Pydantic models enforce consistent JSON structures for reliable frontend rendering.
+- **Token awareness:** tiktoken estimates raw and chunked input sizes and reports token reduction metrics.
+- **Semantic chunking:** Sentence embeddings detect topic shifts instead of dividing transcripts arbitrarily.
+- **Speaker context:** Speaker-tagged transcripts preserve ownership and dialogue context when available.
+- **Controlled concurrency:** Chunk summarization uses an asyncio semaphore to limit simultaneous requests.
+- **Prompt safeguards:** Prompts require concrete, supported information and prevent invented tasks or decisions.
+- **State-driven UI:** The frontend separates normal disabled states from active summarization and unlocks controls only after the summary finishes typing.
 
-```text
-AI-Meeting-Assistant/
-├── app/
-│   ├── api/
-│   │   ├── meeting.py
-│   │   └── user.py
-│   ├── auth/
-│   │   ├── security.py
-│   │   └── validator.py
-│   ├── core/
-│   │   ├── config.py
-│   │   └── schemas.py
-│   ├── database/
-│   │   ├── database.py
-│   │   └── models.py
-│   └── middleware/
-│       └── rate_limiter.py
-├── alembic/
-├── frontend/
-│   ├── css/
-│   ├── js/
-│   │   ├── authentication.js
-│   │   ├── script.js
-│   │   └── runtime-config.js
-│   ├── index.html
-│   └── ...
-├── alembic.ini
-├── .env.example
-├── .gitignore
-├── requirements.txt
-└── README.md
-```
+## API Areas
 
-*The tree highlights the main architectural components; individual frontend files may vary as the interface evolves.*
+| Area | Purpose |
+|---|---|
+| `/user/signup` | Create a user and initialize usage tracking |
+| `/user/login` | Authenticate a user and issue a JWT cookie |
+| `/user/refresh` | Validate or refresh an authenticated session |
+| `/meeting/summarize` | Validate, preprocess, summarize, and return meeting notes |
 
-## API Overview
+## Database Models
 
-| Endpoint | Method | Purpose |
-|---|---|---|
-| `/meeting/summarize` | POST | Upload and summarize a meeting transcript |
-| `/user/signup` | POST | Register a user |
-| `/user/login` | POST | Authenticate a user |
+- `User` stores user identity, email, and hashed password.
+- `Usage` tracks uploaded file size and summary count for each user.
 
-The summarization endpoint accepts a transcript file and returns structured meeting notes. Authentication endpoints handle user registration and login.
+Alembic migrations manage database schema changes independently from application startup.
 
-## Structured Output
+## Supported Output
 
-The generated notes are organized into four main sections:
+The application generates:
 
-- **Overview:** A concise summary of the meeting.
-- **Discussion Points:** The main topics discussed.
-- **Tasks and Deadlines:** Action items and associated deadlines.
-- **Decisions:** Outcomes and decisions reached during the meeting.
+- A concise meeting overview
+- Important discussion topics
+- Explicit tasks and deadlines
+- Final decisions and supporting rationale
+- PDF and clipboard-ready formats
 
-Pydantic schemas provide a consistent response structure, allowing the frontend to render each section according to its content.
+## Current Scope
 
-## Engineering Considerations
-
-### Token Efficiency and Long Transcripts
-
-Long meeting transcripts can increase input token consumption and exceed model context limits. The current development direction is to introduce token-aware processing and intelligent transcript chunking.
-
-Planned improvements include:
-
-- Estimating transcript token counts before making LLM requests.
-- Splitting large transcripts at sensible textual boundaries.
-- Summarizing or extracting relevant information from individual chunks before generating the final notes.
-- Tracking per-user token consumption alongside summary usage.
-
-### Transcript Preprocessing
-
-Transcript exports can contain formatting artifacts, timestamps, filler words, and repeated statements. Preprocessing improvements are being explored to reduce unnecessary input while preserving the meaning and context of the original discussion.
-
-Semantic similarity using SentenceTransformers and cosine similarity is being investigated for detecting redundant sentences.
-
-### Usage Controls
-
-The application is designed with configurable safeguards to help control resource consumption, including file-size limits, transcript-length limits, request-rate limits, and output-token constraints. Daily summary limits are also part of the usage-control design.
-
-## Future Improvements
-
-- Implement token-aware hierarchical summarization for long transcripts.
-- Evaluate semantic deduplication while preserving decisions, deadlines, and speaker attribution.
-
-## Development Status
-
-This project is being developed incrementally, with a focus on modular backend design, structured LLM responses, transcript processing, and responsible resource usage.
+The implementation currently supports `.vtt` meeting transcripts. Authentication and usage controls provide a working foundation, with additional production improvements potentially including distributed rate limiting, account recovery, cloud deployment, and strengthened secret management.
 
 ## Author
 
-**Rohan Patel**
-
-Computer Science graduate interested in AI/ML engineering, backend development, and building practical AI-powered applications.
+**Rohan Patel**  
+Computer Science graduate focused on AI/ML engineering, backend development, and building practical applications that connect language models to structured workflows.
 
 - GitHub: [Rohanpatel512](https://github.com/Rohanpatel512)
-- Project: [AI Meeting Assistant](https://github.com/Rohanpatel512/AI-Meeting-Assistant)

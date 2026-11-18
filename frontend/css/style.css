@@ -1,3 +1,7 @@
+body {
+    font-family: 'Inter', sans-serif;
+}
+
 .meeting-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -260,16 +264,35 @@
     box-shadow: 0 14px 28px rgba(91, 92, 240, 0.28);
 }
 
-button:disabled,
-.choose-file-btn:disabled,
-.remove-btn:disabled,
-.summarize-btn:disabled,
-.summary-actions button:disabled {
-    opacity: 0.6;
+body.summary-locking .choose-file-btn,
+body.summary-locking .remove-btn,
+body.summary-locking .summarize-btn,
+body.summary-locking .summary-actions button {
+    opacity: 1;
     cursor: not-allowed;
     pointer-events: none;
     box-shadow: none;
     transform: none;
+}
+
+body.summary-locking .choose-file-btn {
+    background: #a8abb7;
+    color: #f7f7f8;
+}
+
+body.summary-locking .remove-btn {
+    background: #f0f1f4;
+    color: #9b9daa;
+}
+
+body.summary-locking .summarize-btn {
+    background: #a8abb7;
+    color: #f7f7f8;
+}
+
+body.summary-locking .summary-actions button {
+    background: #eceef2;
+    color: #9a9dab;
 }
 
 .summarize-icon {
