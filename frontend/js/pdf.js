@@ -2,6 +2,10 @@ function cleanPdfText(value) {
     return String(value ?? "")
         .replace(/[\u200B-\u200D]/g, "")
         .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000\uFEFF]/g, " ")
+        .replace(/[\u2010-\u2015\u2212]/g, "-") // Convert all Unicode hyphens & dashes to ASCII "-"
+        .replace(/[\u2018\u2019]/g, "'")        // Convert smart single quotes to ASCII "'"
+        .replace(/[\u201C\u201D]/g, '"')        // Convert smart double quotes to ASCII '"'
+        .replace(/\u2026/g, "...")              // Convert ellipsis character to "..."
         .replace(/\s+/g, " ")
         .trim();
 }
@@ -51,7 +55,7 @@ export function generatePDF(meetingSummary) {
         for (const line of lines) {
             checkPageBreak(lineHeight);
 
-            doc.text(line, x, y);
+            doc.text(line, x, y, { align: "left" });
             y += lineHeight;
         }
     }
@@ -104,7 +108,7 @@ export function generatePDF(meetingSummary) {
                 y += 6;
             }
 
-            doc.text(lines[i], textX, y);
+            doc.text(lines[i], textX, y, { align: "left" });
         }
 
         y += 7;
