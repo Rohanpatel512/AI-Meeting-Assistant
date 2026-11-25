@@ -4,6 +4,13 @@ AI Meeting Assistant is a full-stack application that converts meeting transcrip
 
 The project demonstrates practical applied AI integration, token-efficient transcript processing, authentication, database-backed usage controls, and an interactive frontend.
 
+## Demo
+
+
+https://github.com/user-attachments/assets/0249c82b-5699-456b-9f8c-0a7602c311f1
+
+
+
 ## Project Highlights
 
 - Processes `.vtt` meeting transcripts
